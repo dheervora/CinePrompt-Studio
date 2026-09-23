@@ -9,30 +9,30 @@ An elite, high-fidelity interactive training ground and blueprint generator for 
 To extract maximum knowledge from CinePrompt, follow this progressive four-stage masterclass:
 
 ### Stage 1: Master the Visual Vocabulary 📸
-*   **Where**: `Chamber Glossary`
+*   **Where**: Tab **`01. STUDY GLOSSARY`** (first tab)
 *   **Action**: Browse visual optics categorized by Lens, Angles, Framing, Lighting, Movement, and Color Grading.
-*   **Learning Vector**: Toggle between the **📸 Real-World Frame** (high-contrast authentic photography showing real light behaviors) and the **🧪 Axis Simulator** (interactive mathematical SVG renderers where adjusting parameters like focal length, aperture focus fields, or lights alters the diagram in real time).
+*   **Learning Vector**: Toggle between the **📸 Real-World Frame** (authentic photography showing real light behaviors) and the **🧪 Axis Simulator** (interactive mathematical SVG renderers where adjusting parameters like focal length, aperture focus fields, or lights alters the diagram in real time).
 
 ### Stage 2: Compose with Structural Formulas 🏗️
-*   **Where**: `Modular Blueprint Builder`
-*   **Action**: Select attributes directly from the glossary and append them to your camera recipe.
+*   **Where**: Tab **`02. FORMULA LAB`** (second tab)
+*   **Action**: Assemble a director's camera recipe by picking and tweaking attributes across lens, camera angle, framing, lighting style, camera motion, and film stock emulation.
 *   **Learning Vector**: See how professional directors stack instructions. Learn the exact sequence: *[Subject/Action] + [Lens Profile] + [Angle Profile] + [Framing Boundary] + [Lighting Chiaroscuro] + [Steadicam Motion] + [Film Emulation Embellishment]*.
 
 ### Stage 3: Supercharge Raw Thoughts 🚀
-*   **Where**: `Optic Prompt Optimizer`
-*   **Action**: Type a simple, raw visual sentence (e.g., *"a fast car on a rainy night"*) and click **AI OPTIMIZE**.
-*   **Learning Vector**: Study the output. Review the **Optimized Prompt** and watch the **Critique Matrix** to understand what technical descriptors were missing, why they were missing, and how adding precise details like "anamorphic blue lens flares" or "Rembrandt lighting catchlights" builds photorealism.
+*   **Where**: Tab **`03. AI SUPERCHARGER`** (third tab)
+*   **Action**: Type a simple, raw visual sentence (e.g., *"a fast car on a rainy night"*), choose from quick test presets, or transfer from the Formula Lab, and click **LAUNCH GEMINI 3.8 FLASH**.
+*   **Learning Vector**: Study the output. Powered by `gemini-3.8-flash`, review the **Optimized Prompt** and watch the **Critique Matrix** to understand what technical descriptors were missing, why they were missing, and how adding precise details like "anamorphic blue lens flares" or "Rembrandt lighting catchlights" builds photorealism.
 
-### Stage 4: Battle in the Chamber Arena 🏆
-*   **Where**: `Technical Arena`
-*   **Action**: Click **Chamber Arena** and pick a challenge card (e.g., *Sartorial Neo-Noir* or *Macro Biomechanics*). Draft an answer prompt attempting to meet the cinematic constraints, and submit it for evaluation.
-*   **Learning Vector**: The **Dean of Photography** (powered by Gemini AI) scores your output from 0 to 100, checking for concept matches, identifying crucial omissions, giving an analytical director's critique, and providing the **Optimal Blueprint** to compare against.
+### Stage 4: Battle in the Practice Arena 🏆
+*   **Where**: Tab **`04. PRACTICE ARENA`** (fourth tab)
+*   **Action**: Pick a challenge card (e.g., *Dramatic Boxing Silhouette* or *Vibrant Retro Cyberpunk Night*). Draft an answer prompt or click **Load Sample Draft**, and submit it for evaluation.
+*   **Learning Vector**: The **Dean of Photography** (powered by `gemini-3.8-flash`) scores your output from 0 to 100, checking for concept matches, identifying crucial omissions, giving an analytical director's critique, and providing the **Optimal Blueprint** to compare against.
 
 ---
 
 ## ☁️ Programmatic Export System ⚙️
 
-Once you have mastered prompt-building inside the app, export your setups using the **AI Agent Skill Exporter**:
+Once you have mastered prompt-building inside the app, export your setups using tab **`05. EXPORT SKILL`**:
 *   **Markdown Skill Block**: A bite-sized visual prompting reference sheet to feed directly into your dynamic system context.
 *   **System Instructions**: A professional custom profile config to paste inside custom ChatGPT Agents, Claude Projects, or system instructions.
 *   **JSON Schema**: Structured key-value properties to feed directly into program backends or image generator endpoints.

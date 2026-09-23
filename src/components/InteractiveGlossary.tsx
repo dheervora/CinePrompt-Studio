@@ -138,6 +138,36 @@ export default function InteractiveGlossary({ onAddTermToFormula }: InteractiveG
     setTimeout(() => setCopiedField(null), 1500);
   };
 
+  const handleSelectTerm = (term: PhotoTerm) => {
+    setSelectedTerm(term);
+    if (term.id === 'lens-wide-14mm') {
+      setFocalLength(14);
+      setAperture(8.0);
+    } else if (term.id === 'lens-portrait-85mm') {
+      setFocalLength(85);
+      setAperture(1.8);
+    } else if (term.id === 'lens-telephoto-200mm') {
+      setFocalLength(200);
+      setAperture(2.8);
+    } else if (term.id === 'lens-macro-100mm') {
+      setFocalLength(100);
+      setAperture(2.8);
+    } else if (term.id === 'lens-anamorphic') {
+      setFocalLength(50);
+      setAperture(2.0);
+    } else if (term.id === 'angle-dutch') {
+      setCantedAngle(20);
+    } else if (term.id === 'lighting-rembrandt') {
+      setActiveLights({ key: true, fill: false, rim: true });
+    } else if (term.id === 'lighting-highkey') {
+      setActiveLights({ key: true, fill: true, rim: true });
+    } else if (term.id === 'lighting-lowkey') {
+      setActiveLights({ key: true, fill: false, rim: false });
+    } else if (term.id === 'lighting-rim-edge') {
+      setActiveLights({ key: false, fill: false, rim: true });
+    }
+  };
+
   const getFocalLabel = (val: number) => {
     if (val <= 24) return `${val}mm (Ultra-Wide Angle - Distortion Frame)`;
     if (val <= 55) return `${val}mm (Normal Standard/Perspective)`;
@@ -149,56 +179,132 @@ export default function InteractiveGlossary({ onAddTermToFormula }: InteractiveG
   const renderInteractiveSimulator = () => {
     switch (selectedTerm.category) {
       case 'lenses':
+        const isWide = focalLength <= 24;
+        const isTele = focalLength >= 85;
+        const isShallow = aperture <= 2.8;
+        const isDeep = aperture >= 8;
+        const blurPx = Math.max(0, (11 - aperture) * 1.5);
+        const bgScale = 0.7 + (focalLength - 14) / 110;
+
         return (
           <div className="bg-[#050505] p-5 rounded-none border border-white/10 space-y-4">
             <div className="flex justify-between items-center text-[10px] uppercase tracking-wider text-white/40 font-mono">
               <span>Simulation Platform: Camera Lens Laboratory</span>
-              <span className="text-[#F27D26] font-bold">100% Core Matrix</span>
+              <span className={`font-mono text-[9px] px-2 py-0.5 border font-bold ${
+                isShallow ? 'bg-amber-950/60 text-amber-300 border-amber-500/40' :
+                isDeep ? 'bg-sky-950/60 text-sky-300 border-sky-500/40' :
+                'bg-white/5 text-white/70 border-white/15'
+              }`}>
+                {isShallow ? 'CREAMY BOKEH (SHALLOW DOF)' : isDeep ? 'DEEP FOCUS (SHARP HORIZON)' : 'BALANCED DEPTH'}
+              </span>
             </div>
 
-            {/* Simulated Viewport box */}
-            <div className="relative h-44 bg-black rounded-none border border-white/10 flex items-center justify-center">
-              {/* Blurred background (simulating aperture) */}
-              <div 
-                className="absolute inset-0 bg-cover transition-all duration-300 flex justify-around items-center opacity-30 px-6"
-                style={{
-                  filter: `blur(${Math.max(0, (10 - aperture) * 1.5)}px)`,
-                  transform: `scale(${1 + (focalLength - 14) / 300})`
-                }}
-              >
-                {/* Background Grid Elements */}
-                <div className="w-12 h-20 bg-white/20 rounded-none"></div>
-                <div className="w-8 h-12 bg-white/10 rounded-full"></div>
-                <div className="w-16 h-16 bg-white/5 rounded-none"></div>
+            {/* Simulated Optical Viewport */}
+            <div className="relative h-48 bg-black rounded-none border border-white/10 flex items-center justify-center overflow-hidden">
+              {/* Background Status Tag */}
+              <div className="absolute top-2 left-2 z-20 text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 bg-black/80 border border-white/15 text-white/60">
+                BACKGROUND: {isShallow ? 'BLURRED BOKEH' : isDeep ? 'SHARP & CLEAR' : 'SOFT FOCUS'}
               </div>
 
-              {/* Compressed Foreground Subject (Sharply Focused) */}
+              {/* Angle of View Tag */}
+              <div className="absolute top-2 right-2 z-20 text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 bg-black/80 border border-white/15 text-[#F27D26]">
+                FOV: {isWide ? '114° ULTRA-WIDE' : isTele ? '12° COMPRESSED' : '47° NORMAL'}
+              </div>
+
+              {/* BACKGROUND LAYER: Stylized City Skyline + Bokeh Lights */}
               <div 
-                className="relative z-10 transition-transform duration-300 flex flex-col items-center"
+                className="absolute inset-0 transition-all duration-300 flex items-end justify-center pointer-events-none"
                 style={{
-                  transform: `scale(${1 + (focalLength - 14) / 100})`
+                  filter: `blur(${blurPx}px)`,
+                  transform: `scale(${bgScale})`,
+                  transformOrigin: 'bottom center'
                 }}
               >
-                {/* Vector Person Avatar using orange aesthetic accent */}
-                <svg className="w-20 h-20 text-[#F27D26]" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
-                </svg>
-                <div className="text-[9px] font-mono font-bold text-black bg-[#F27D26] px-2 py-0.5 rounded-none mt-1 uppercase tracking-widest">
-                  SHARP PLANE
+                {/* Vector Cityscape Backdrop */}
+                <div className="w-full h-36 flex items-end justify-around px-2 opacity-50">
+                  <div className="w-9 h-28 bg-white/20 border-t border-white/40 flex flex-col justify-around items-center p-1">
+                    <div className="w-full h-1 bg-amber-400/80"></div>
+                    <div className="w-full h-1 bg-amber-400/80"></div>
+                    <div className="w-full h-1 bg-amber-400/80"></div>
+                  </div>
+                  <div className="w-14 h-36 bg-white/15 border-t border-white/30 flex flex-col justify-around items-center p-1">
+                    <div className="w-full h-1 bg-cyan-400/80"></div>
+                    <div className="w-full h-1 bg-cyan-400/80"></div>
+                    <div className="w-full h-1 bg-cyan-400/80"></div>
+                  </div>
+                  <div className="w-11 h-24 bg-white/25 border-t border-white/50 flex flex-col justify-around items-center p-1">
+                    <div className="w-full h-1 bg-amber-300/80"></div>
+                    <div className="w-full h-1 bg-amber-300/80"></div>
+                  </div>
+                  <div className="w-16 h-32 bg-white/10 border-t border-white/20 flex flex-col justify-around items-center p-1">
+                    <div className="w-full h-1 bg-rose-400/80"></div>
+                    <div className="w-full h-1 bg-rose-400/80"></div>
+                  </div>
+                </div>
+
+                {/* Bokeh Light Discs that expand into circles when aperture is wide */}
+                <div className="absolute inset-0 flex justify-around items-center px-4">
+                  <div 
+                    className="rounded-full bg-amber-400/90 shadow-[0_0_12px_rgba(251,191,36,0.8)] transition-all duration-300"
+                    style={{
+                      width: `${isShallow ? 24 : 6}px`,
+                      height: `${isShallow ? 24 : 6}px`,
+                      opacity: isShallow ? 0.85 : 0.4
+                    }}
+                  />
+                  <div 
+                    className="rounded-full bg-cyan-400/90 shadow-[0_0_14px_rgba(34,211,238,0.8)] transition-all duration-300"
+                    style={{
+                      width: `${isShallow ? 30 : 7}px`,
+                      height: `${isShallow ? 30 : 7}px`,
+                      opacity: isShallow ? 0.9 : 0.4
+                    }}
+                  />
+                  <div 
+                    className="rounded-full bg-rose-400/90 shadow-[0_0_10px_rgba(251,113,133,0.8)] transition-all duration-300"
+                    style={{
+                      width: `${isShallow ? 20 : 5}px`,
+                      height: `${isShallow ? 20 : 5}px`,
+                      opacity: isShallow ? 0.8 : 0.4
+                    }}
+                  />
+                  <div 
+                    className="rounded-full bg-amber-300/90 shadow-[0_0_16px_rgba(252,211,77,0.8)] transition-all duration-300"
+                    style={{
+                      width: `${isShallow ? 26 : 6}px`,
+                      height: `${isShallow ? 26 : 6}px`,
+                      opacity: isShallow ? 0.85 : 0.4
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* Lens flare line if selectedTerm is anamorphic */}
+              {/* FOREGROUND SUBJECT (Always Tack-Sharp) */}
+              <div 
+                className="relative z-10 transition-transform duration-300 flex flex-col items-center"
+                style={{
+                  transform: `scale(${isWide ? 0.85 : isTele ? 1.25 : 1})`
+                }}
+              >
+                <svg className="w-20 h-20 text-[#F27D26] drop-shadow-md" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/>
+                </svg>
+                <div className="text-[8px] font-mono font-black text-black bg-[#F27D26] px-2 py-0.5 rounded-none mt-0.5 uppercase tracking-widest">
+                  SHARP FOREGROUND FOCUS
+                </div>
+              </div>
+
+              {/* Anamorphic Flare Line */}
               {selectedTerm.id === 'lens-anamorphic' && (
-                <div className="absolute inset-x-0 h-[1.5px] bg-sky-400 opacity-90 shadow-[0_0_8px_rgba(56,189,248,0.8)] z-20"></div>
+                <div className="absolute inset-x-0 h-[2px] bg-sky-400 opacity-95 shadow-[0_0_12px_rgba(56,189,248,0.9)] z-20"></div>
               )}
             </div>
 
             {/* Interactive Sliders */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
                 <div className="flex justify-between items-center text-xs mb-1 font-mono uppercase text-white/70">
-                  <span>Focal Length Index:</span>
+                  <span>Focal Length (Field of View & Compression):</span>
                   <span className="text-[#F27D26] font-bold">{getFocalLabel(focalLength)}</span>
                 </div>
                 <input 
@@ -213,19 +319,45 @@ export default function InteractiveGlossary({ onAddTermToFormula }: InteractiveG
 
               <div>
                 <div className="flex justify-between items-center text-xs mb-1 font-mono uppercase text-white/70">
-                  <span>Aperture Vector:</span>
-                  <span className="text-[#F27D26] font-bold">f/{aperture} {aperture <= 2.8 ? '(Tighter DOF - Creamy Bokeh)' : '(Deep Focus)'}</span>
+                  <span>Aperture (f-stop: Depth of Field):</span>
+                  <span className="text-[#F27D26] font-bold">f/{aperture} {isShallow ? '(Wide Open → Melts Background into Bokeh)' : isDeep ? '(Small Pin-hole → Deep Focus Horizon)' : '(Moderate DOF)'}</span>
                 </div>
                 <input 
                   type="range" 
                   min="1.4" 
                   max="16" 
-                  step="0.7"
+                  step="0.7" 
                   value={aperture} 
                   onChange={(e) => setAperture(Number(e.target.value))}
                   className="w-full accent-[#F27D26] bg-[#0A0A0A] border border-white/15 h-2 appearance-none cursor-pointer rounded-none"
                 />
               </div>
+            </div>
+
+            {/* Live Educational Matrix: Plain English Breakdown */}
+            <div className="bg-black/90 p-3.5 border border-white/10 space-y-2 text-left">
+              <div className="text-[9px] font-mono text-[#F27D26] font-black uppercase tracking-wider flex items-center justify-between">
+                <span>WHAT IS HAPPENING TO THE OPTICS:</span>
+                <span className="text-white/40 font-normal">f/{aperture} • {focalLength}mm</span>
+              </div>
+              <p className="text-[11px] text-white/80 leading-relaxed font-sans">
+                <strong className="text-white font-mono uppercase tracking-wide">Aperture (Depth of Field): </strong>
+                {isShallow 
+                  ? `At f/${aperture}, the lens opening is wide open. Background streetlights bloom into glowing circular bokeh discs, blurring the skyline and isolating your subject.`
+                  : isDeep 
+                  ? `At f/${aperture}, the lens opening constricts into a narrow hole. Both the subject in the foreground and the distant city skyline remain sharp and clear.`
+                  : `At f/${aperture}, there is moderate background separation while preserving the architecture's recognizable shape.`
+                }
+              </p>
+              <p className="text-[11px] text-white/80 leading-relaxed font-sans">
+                <strong className="text-white font-mono uppercase tracking-wide">Focal Length (Perspective): </strong>
+                {isWide 
+                  ? `At ${focalLength}mm, the ultra-wide field of view (114°) pushes background buildings into the distance, emphasizing vast spatial scale.`
+                  : isTele 
+                  ? `At ${focalLength}mm, telephoto compression magnifies the background skyline, making distant buildings look gigantic and right behind the subject.`
+                  : `At ${focalLength}mm, spatial perspective mirrors the natural human eye.`
+                }
+              </p>
             </div>
           </div>
         );
@@ -580,7 +712,7 @@ export default function InteractiveGlossary({ onAddTermToFormula }: InteractiveG
                 return (
                   <div 
                     key={term.id}
-                    onClick={() => setSelectedTerm(term)}
+                    onClick={() => handleSelectTerm(term)}
                     className={`p-6 rounded-none border cursor-pointer transition-all text-left flex flex-col justify-between h-48 relative overflow-hidden ${
                       isSelected 
                         ? 'bg-gradient-to-br from-[#0c0c0c] to-[#121212] text-white border-2 border-[#F27D26] shadow-xl' 
@@ -643,27 +775,34 @@ export default function InteractiveGlossary({ onAddTermToFormula }: InteractiveG
           </div>
 
           {/* Visualization Platform Selector */}
-          <div className="grid grid-cols-2 gap-1 p-1 bg-black border border-white/10 select-none">
-            <button 
-              onClick={() => setActiveVisualTab('reference')} 
-              className={`py-2 px-3 text-[9px] font-mono font-black uppercase tracking-widest text-center transition-all cursor-pointer ${
-                activeVisualTab === 'reference' 
-                  ? 'bg-[#F27D26] text-black font-black' 
-                  : 'bg-transparent text-white/50 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              📸 Real-World Frame
-            </button>
-            <button 
-              onClick={() => setActiveVisualTab('simulator')} 
-              className={`py-2 px-3 text-[9px] font-mono font-black uppercase tracking-widest text-center transition-all cursor-pointer ${
-                activeVisualTab === 'simulator' 
-                  ? 'bg-[#F27D26] text-black font-black' 
-                  : 'bg-transparent text-white/50 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              🧪 Axis Simulator
-            </button>
+          <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-1 p-1 bg-black border border-white/10 select-none">
+              <button 
+                onClick={() => setActiveVisualTab('reference')} 
+                className={`py-2 px-3 text-[9px] font-mono font-black uppercase tracking-widest text-center transition-all cursor-pointer ${
+                  activeVisualTab === 'reference' 
+                    ? 'bg-[#F27D26] text-black font-black' 
+                    : 'bg-transparent text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                📸 Real-World Frame
+              </button>
+              <button 
+                onClick={() => setActiveVisualTab('simulator')} 
+                className={`py-2 px-3 text-[9px] font-mono font-black uppercase tracking-widest text-center transition-all cursor-pointer ${
+                  activeVisualTab === 'simulator' 
+                    ? 'bg-[#F27D26] text-black font-black' 
+                    : 'bg-transparent text-white/50 hover:text-white hover:bg-white/5'
+                }`}
+              >
+                🧪 Axis Simulator
+              </button>
+            </div>
+            <p className="text-[9px] font-mono text-white/40 uppercase tracking-wider text-center">
+              {activeVisualTab === 'reference' 
+                ? '• Authentic reference photograph showing real optical behavior'
+                : '• Interactive vector schematic: click lights/sliders below to test light vectors'}
+            </p>
           </div>
 
           {/* Render selected representation */}

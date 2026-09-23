@@ -28,9 +28,53 @@ if (geminiKey) {
   console.warn("WARNING: GEMINI_API_KEY is not defined in the environment. AI-driven features will run in offline/simulation mode.");
 }
 
+// Resilient caller with transient retry & fallback model
+async function callGeminiWithRetry(contents: string, responseSchema: any, maxRetries = 2): Promise<string> {
+  if (!ai) throw new Error("Gemini AI client not initialized");
+
+  const modelsToTry = ['gemini-3.8-flash', 'gemini-flash-latest'];
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema,
+          },
+        });
+        return response.text || "{}";
+      } catch (err: any) {
+        lastError = err;
+        const isTransient = err?.message?.includes('503') || err?.status === 503 || err?.message?.includes('high demand');
+        if (isTransient && attempt < maxRetries - 1) {
+          // Wait briefly before retrying
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+        break;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 // ----------------------------------------------------
 // API ENDPOINTS
 // ----------------------------------------------------
+
+// 0. Model Status & Health Endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    model: 'gemini-3.8-flash',
+    hasKey: Boolean(geminiKey),
+  });
+});
 
 // 1. Optimize Prompt Endpoint
 app.post('/api/optimize-prompt', async (req, res) => {
@@ -80,45 +124,47 @@ app.post('/api/optimize-prompt', async (req, res) => {
       - cinematicAnalogy (string): A reference film or director that shares this visual language (e.g., "Reminiscent of Roger Deakins' cinematography in Blade Runner 2049").
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
-      contents: promptString,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            originalPrompt: { type: Type.STRING },
-            optimizedImagePrompt: { type: Type.STRING },
-            optimizedVideoPrompt: { type: Type.STRING },
-            pacingBreakdown: { type: Type.STRING },
-            addedVocabulary: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  term: { type: Type.STRING },
-                  benefit: { type: Type.STRING },
-                  category: { type: Type.STRING }
-                },
-                required: ["term", "benefit", "category"]
-              }
+    const resultText = await callGeminiWithRetry(promptString, {
+      type: Type.OBJECT,
+      properties: {
+        originalPrompt: { type: Type.STRING },
+        optimizedImagePrompt: { type: Type.STRING },
+        optimizedVideoPrompt: { type: Type.STRING },
+        pacingBreakdown: { type: Type.STRING },
+        addedVocabulary: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              term: { type: Type.STRING },
+              benefit: { type: Type.STRING },
+              category: { type: Type.STRING }
             },
-            sceneAtmosphere: { type: Type.STRING },
-            cinematicAnalogy: { type: Type.STRING }
-          },
-          required: ["originalPrompt", "optimizedImagePrompt", "optimizedVideoPrompt", "addedVocabulary", "sceneAtmosphere"]
-        }
-      }
+            required: ["term", "benefit", "category"]
+          }
+        },
+        sceneAtmosphere: { type: Type.STRING },
+        cinematicAnalogy: { type: Type.STRING }
+      },
+      required: ["originalPrompt", "optimizedImagePrompt", "optimizedVideoPrompt", "addedVocabulary", "sceneAtmosphere"]
     });
 
-    const resultText = response.text || "{}";
     const resultJson = JSON.parse(resultText);
     res.json(resultJson);
 
   } catch (error: any) {
     console.error("Gemini optimization error: ", error);
-    res.status(500).json({ error: "Failed to optimize prompt. Gemini API returned an error.", details: error.message });
+    const isRateLimit = error?.message?.includes('429') || error?.status === 429 || error?.message?.includes('quota');
+    const isHighDemand = error?.message?.includes('503') || error?.status === 503 || error?.message?.includes('high demand');
+    let errorMsg = "Failed to optimize prompt with Gemini 3.8 Flash.";
+    if (isRateLimit) {
+      errorMsg = "Gemini API rate limit reached (Free tier: 15 RPM). Please wait 30-60 seconds before retrying.";
+    } else if (isHighDemand) {
+      errorMsg = "Gemini 3.8 Flash is experiencing a brief high-demand spike on the network. Click 'Retry Now' to re-query.";
+    } else if (error?.message) {
+      errorMsg = "Gemini 3.8 Flash notice: " + error.message;
+    }
+    res.status(isRateLimit ? 429 : (isHighDemand ? 503 : 500)).json({ error: errorMsg, details: error.message });
   }
 });
 
@@ -167,33 +213,35 @@ app.post('/api/grade-prompt', async (req, res) => {
       - suggestedPrompt (string): A corrected, exceptionally refined version of their prompt that models the ideal answer.
     `;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
-      contents: promptString,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            score: { type: Type.INTEGER },
-            grammarFeedback: { type: Type.STRING },
-            technicalMatch: { type: Type.ARRAY, items: { type: Type.STRING } },
-            omissions: { type: Type.ARRAY, items: { type: Type.STRING } },
-            critique: { type: Type.STRING },
-            suggestedPrompt: { type: Type.STRING }
-          },
-          required: ["score", "critique", "suggestedPrompt", "technicalMatch", "omissions"]
-        }
-      }
+    const resultText = await callGeminiWithRetry(promptString, {
+      type: Type.OBJECT,
+      properties: {
+        score: { type: Type.INTEGER },
+        grammarFeedback: { type: Type.STRING },
+        technicalMatch: { type: Type.ARRAY, items: { type: Type.STRING } },
+        omissions: { type: Type.ARRAY, items: { type: Type.STRING } },
+        critique: { type: Type.STRING },
+        suggestedPrompt: { type: Type.STRING }
+      },
+      required: ["score", "critique", "suggestedPrompt", "technicalMatch", "omissions"]
     });
 
-    const resultText = response.text || "{}";
     const resultJson = JSON.parse(resultText);
     res.json(resultJson);
 
   } catch (error: any) {
     console.error("Gemini grading error: ", error);
-    res.status(500).json({ error: "Failed to grade your prompt. Gemini API returned an error.", details: error.message });
+    const isRateLimit = error?.message?.includes('429') || error?.status === 429 || error?.message?.includes('quota');
+    const isHighDemand = error?.message?.includes('503') || error?.status === 503 || error?.message?.includes('high demand');
+    let errorMsg = "Failed to grade your prompt with Gemini 3.8 Flash.";
+    if (isRateLimit) {
+      errorMsg = "Gemini API rate limit reached (Free tier: 15 RPM). Please wait 30-60 seconds before retrying.";
+    } else if (isHighDemand) {
+      errorMsg = "Gemini 3.8 Flash is experiencing a brief high-demand spike on the network. Click 'Retry' to re-evaluate.";
+    } else if (error?.message) {
+      errorMsg = "Gemini 3.8 Flash notice: " + error.message;
+    }
+    res.status(isRateLimit ? 429 : (isHighDemand ? 503 : 500)).json({ error: errorMsg, details: error.message });
   }
 });
 
@@ -213,7 +261,7 @@ async function startServer() {
     // Serve static files in production
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
+    app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }

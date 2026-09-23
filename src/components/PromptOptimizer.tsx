@@ -16,11 +16,19 @@ const LOADING_MESSAGES = [
 ];
 
 export default function PromptOptimizer({ draftedPrompt }: PromptOptimizerProps) {
+  const [activePrompt, setActivePrompt] = useState(draftedPrompt || '');
   const [loading, setLoading] = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [errorString, setErrorString] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizationResult | null>(null);
   const [copiedType, setCopiedType] = useState<'img' | 'video' | null>(null);
+
+  // Sync if draftedPrompt changes from Formula Lab
+  useEffect(() => {
+    if (draftedPrompt && !activePrompt) {
+      setActivePrompt(draftedPrompt);
+    }
+  }, [draftedPrompt]);
 
   // Cycling loading message effect
   useEffect(() => {
@@ -34,7 +42,8 @@ export default function PromptOptimizer({ draftedPrompt }: PromptOptimizerProps)
   }, [loading]);
 
   const handleOptimize = async () => {
-    if (!draftedPrompt.trim()) return;
+    const promptToSend = activePrompt.trim() || draftedPrompt.trim();
+    if (!promptToSend) return;
 
     setLoading(true);
     setErrorString(null);
@@ -45,11 +54,12 @@ export default function PromptOptimizer({ draftedPrompt }: PromptOptimizerProps)
       const response = await fetch('/api/optimize-prompt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: draftedPrompt })
+        body: JSON.stringify({ prompt: promptToSend })
       });
 
       if (!response.ok) {
-        throw new Error(`Server returned error status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Server returned error status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -72,43 +82,87 @@ export default function PromptOptimizer({ draftedPrompt }: PromptOptimizerProps)
     setTimeout(() => setCopiedType(null), 1500);
   };
 
+  const QUICK_PRESETS = [
+    { label: "NEON DETECTIVE", prompt: "A brooding cybernetic detective smoking a cigarette under pouring rain in a narrow neon-drenched alleyway." },
+    { label: "AMALFI COAST", prompt: "A vintage 1965 convertible speeding along the dramatic sun-drenched Amalfi cliffside road at sunset." },
+    { label: "MACRO WATCHMAKER", prompt: "Extreme macro detail of delicate brass gears, rubies, and moving balance wheel inside a Swiss mechanical wristwatch." },
+    { label: "SAHARA NOMAD", prompt: "A solitary Tuareg nomad and camel standing atop a wind-sculpted sand dune during golden hour." }
+  ];
+
   return (
     <div className="bg-[#0A0A0A] p-6 rounded-none border border-white/10 shadow-lg text-left space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/15 pb-4">
         <div>
-          <h3 className="font-display font-black text-lg text-white flex items-center gap-2 uppercase tracking-tight">
-            <Sparkles className="w-5 h-5 text-[#F27D26] animate-pulse" />
-            Gemini Director of Photography AI
-          </h3>
+          <div className="flex items-center gap-3">
+            <h3 className="font-display font-black text-lg text-white flex items-center gap-2 uppercase tracking-tight">
+              <Sparkles className="w-5 h-5 text-[#F27D26] animate-pulse" />
+              Gemini Director of Photography AI
+            </h3>
+            <span className="px-2 py-0.5 bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 font-mono text-[9px] uppercase tracking-wider font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              gemini-3.8-flash
+            </span>
+          </div>
           <p className="text-xs text-white/50 font-sans mt-0.5 uppercase tracking-wide">
-            Evaluate, test, and adapt prompts into highly articulate cinematic statements.
+            Powered by the latest Gemini 3.8 Flash model. Transforms raw concepts into high-end cinematic prompts with lenses, lighting ratios, and camera movement.
           </p>
         </div>
 
         <button
           onClick={handleOptimize}
-          disabled={loading || !draftedPrompt.trim()}
+          disabled={loading || !activePrompt.trim()}
           className="px-6 py-3 bg-[#F27D26] hover:bg-white disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed text-black text-xs font-black font-mono tracking-widest rounded-none cursor-pointer shadow-md transition-all flex items-center gap-2"
         >
           {loading ? (
             <>
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              <span>SUPERCHARGING...</span>
+              <span>OPTIMIZING PROMPT...</span>
             </>
           ) : (
             <>
-              <span>LAUNCH AI CRITIQUE</span>
+              <span>LAUNCH GEMINI 3.8 FLASH</span>
             </>
           )}
         </button>
       </div>
 
-      {/* Drafted Source Reference */}
-      <div className="bg-black p-4 rounded-none border border-white/10 space-y-1">
-        <span className="text-[9px] font-bold text-[#F27D26] uppercase font-mono tracking-wider">ACTIVE SELECTION SOURCE:</span>
-        <p className="text-xs text-white/80 font-sans italic leading-relaxed line-clamp-2">
-          "{draftedPrompt || "No prompt draft has been fed yet. Go to Formula Lab to assemble a draft or type directly in custom subjects."}"
-        </p>
+      {/* Interactive Prompt Input & Preset Bar */}
+      <div className="bg-black p-5 rounded-none border border-white/10 space-y-3">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+          <label className="text-[10px] font-mono font-bold text-[#F27D26] uppercase tracking-wider flex items-center gap-2">
+            <span>INPUT PROMPT DRAFT</span>
+            <span className="text-white/30 text-[9px] font-normal">(Type custom or click a preset below)</span>
+          </label>
+          {draftedPrompt && draftedPrompt !== activePrompt && (
+            <button
+              onClick={() => setActivePrompt(draftedPrompt)}
+              className="text-[9px] font-mono text-white/60 hover:text-[#F27D26] transition-colors underline uppercase cursor-pointer"
+            >
+              Load from Formula Lab
+            </button>
+          )}
+        </div>
+
+        <textarea
+          value={activePrompt}
+          onChange={(e) => setActivePrompt(e.target.value)}
+          placeholder="Enter a raw concept (e.g., A weary detective standing in the rain under streetlights...)"
+          className="w-full bg-neutral-950 p-3.5 text-xs font-mono text-white/90 border border-white/15 focus:border-[#F27D26] focus:outline-none rounded-none leading-relaxed h-20 resize-y"
+        />
+
+        {/* Quick test presets */}
+        <div className="pt-1 flex flex-wrap items-center gap-2">
+          <span className="text-[9px] font-mono text-white/40 uppercase tracking-widest mr-1">TEST PRESETS:</span>
+          {QUICK_PRESETS.map((preset, i) => (
+            <button
+              key={i}
+              onClick={() => setActivePrompt(preset.prompt)}
+              className="px-2.5 py-1 bg-white/5 hover:bg-white/10 hover:border-[#F27D26]/40 border border-white/10 text-white/80 font-mono text-[9px] uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Loading state rendering */}
@@ -128,15 +182,23 @@ export default function PromptOptimizer({ draftedPrompt }: PromptOptimizerProps)
 
       {/* Error State */}
       {errorString && (
-        <div className="bg-[#1A0B0E] border border-red-900 p-4 rounded-none text-red-100 flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-          <div className="text-xs space-y-1 leading-normal font-sans">
-            <span className="font-bold uppercase tracking-wider text-red-400">Gemini API Connection Problem:</span>
-            <p className="text-white/80">{errorString}</p>
-            <p className="text-[9px] text-red-400 font-mono uppercase tracking-wider mt-1.5">
-              Check that your Secrets are verified in settings. Running local simulations fallback if key unavailable.
-            </p>
+        <div className="bg-[#1A0B0E] border border-red-900 p-4 rounded-none text-red-100 flex items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1 leading-normal font-sans">
+              <span className="font-bold uppercase tracking-wider text-red-400">Gemini Notice:</span>
+              <p className="text-white/80">{errorString}</p>
+              <p className="text-[9px] text-red-400 font-mono uppercase tracking-wider mt-1.5">
+                Tip: Spikes in model demand or rate limits clear quickly. Click retry below to query Gemini again.
+              </p>
+            </div>
           </div>
+          <button
+            onClick={handleOptimize}
+            className="px-3.5 py-1.5 bg-red-950/80 hover:bg-white hover:text-black border border-red-500/40 text-red-200 text-[10px] font-mono font-bold uppercase tracking-widest transition-colors shrink-0 cursor-pointer"
+          >
+            Retry Now
+          </button>
         </div>
       )}
 

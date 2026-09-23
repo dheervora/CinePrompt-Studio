@@ -133,9 +133,20 @@ export default function PracticeArena() {
 
         {/* User Input Block */}
         <div className="space-y-2">
-          <label className="text-[10px] font-mono font-black text-[#F27D26] uppercase tracking-[0.2em] block">
-            Draft your Photographic Prompt Answer
-          </label>
+          <div className="flex justify-between items-center">
+            <label className="text-[10px] font-mono font-black text-[#F27D26] uppercase tracking-[0.2em] block">
+              Draft your Photographic Prompt Answer
+            </label>
+            {selectedChallenge.sampleSolution && (
+              <button
+                type="button"
+                onClick={() => setUserPromptAnswer(selectedChallenge.sampleSolution)}
+                className="text-[9px] font-mono text-white/60 hover:text-[#F27D26] transition-colors uppercase underline cursor-pointer"
+              >
+                Load Sample Draft
+              </button>
+            )}
+          </div>
           <textarea
             placeholder="A low-key portrait of a boxer sitting on a..."
             value={userPromptAnswer}
@@ -176,15 +187,23 @@ export default function PracticeArena() {
 
         {/* Error Notification */}
         {errorString && (
-          <div className="bg-[#1A0B0E] border border-red-900 p-4 rounded-none text-red-100 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <div className="text-xs space-y-1 leading-normal font-sans">
-              <span className="font-bold uppercase tracking-wider text-red-400">Grading Module Error:</span>
-              <p className="text-white/80">{errorString}</p>
-              <p className="text-[9px] text-red-400 font-mono uppercase tracking-wider mt-1">
-                API key required for full grades. Interactive simulations are offline fallback configured otherwise.
-              </p>
+          <div className="bg-[#1A0B0E] border border-red-900 p-4 rounded-none text-red-100 flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="text-xs space-y-1 leading-normal font-sans">
+                <span className="font-bold uppercase tracking-wider text-red-400">Gemini Grading Notice:</span>
+                <p className="text-white/80">{errorString}</p>
+                <p className="text-[9px] text-red-400 font-mono uppercase tracking-wider mt-1">
+                  Tip: Rate limits or momentary server spikes pass quickly. Click retry to re-evaluate.
+                </p>
+              </div>
             </div>
+            <button
+              onClick={handleSubmitQuiz}
+              className="px-3.5 py-1.5 bg-red-950/80 hover:bg-white hover:text-black border border-red-500/40 text-red-200 text-[10px] font-mono font-bold uppercase tracking-widest transition-colors shrink-0 cursor-pointer"
+            >
+              Retry
+            </button>
           </div>
         )}
       </div>
@@ -193,7 +212,10 @@ export default function PracticeArena() {
       <div className="lg:col-span-5 space-y-6">
         <div className="bg-[#0A0A0A] p-6 rounded-none border border-white/10 shadow-lg text-left space-y-6 sticky top-4">
           <div className="border-b border-white/10 pb-3 flex justify-between items-center text-[9px] text-white/50 font-mono uppercase tracking-widest">
-            <span>EXAM REVIEW BOARD</span>
+            <span className="flex items-center gap-1.5">
+              <span>EXAM REVIEW BOARD</span>
+              <span className="text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.2">3.8 Flash</span>
+            </span>
             <span className="text-[#F27D26] font-black">Dean of Photography</span>
           </div>
 
