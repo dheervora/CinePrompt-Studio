@@ -1,84 +1,42 @@
-# CinePrompt: Technical Cinema Director & Prompt Arena 🎬
+# CinePrompt Studio
 
-An elite, high-fidelity interactive training ground and blueprint generator for cinematic visual prompting. Built with a unified high-contrast industrial visual language (**Chamber Dark**, **Neon Ochre `#F27D26`**, and **Slate Monospacings**), CinePrompt transforms descriptive descriptions into exact Hollywood director configurations.
+Learn photography and cinematography terms, see what each one does, and use them to write better prompts for Gemini, Midjourney, and Veo.
 
----
+## What's inside
 
-## ⚡ Progressive Learning Path
+| Tab | What it's for |
+| :-- | :-- |
+| **Glossary** | 48 terms in 8 topics, ordered as a learning path (light → composition → shot size → angle → lenses → exposure → color → movement). Each term has an interactive diagram, links to real example photos, and ready-made prompt phrases. |
+| **Formula Lab** | Build a prompt one decision at a time. The preview is colour-coded by choice, and warns you when choices contradict each other. Switch between Gemini (descriptive sentences), Midjourney (phrases + `--ar`), and Veo (movement first). |
+| **A/B Lab** | Change one setting, keep everything else the same, and compare the two pictures. |
+| **Supercharger** | Paste a rough idea; Gemini adds the missing photographic decisions and explains each change. |
+| **Practice** | Plain-language briefs. Write the prompt, get a score out of 100 across five areas, and see which techniques the brief was describing. |
+| **Export** | Download the glossary as a cheat sheet, AI assistant instructions, or JSON. |
 
-To extract maximum knowledge from CinePrompt, follow this progressive four-stage masterclass:
+## Setup
 
-### Stage 1: Master the Visual Vocabulary 📸
-*   **Where**: Tab **`01. STUDY GLOSSARY`** (first tab)
-*   **Action**: Browse visual optics categorized by Lens, Angles, Framing, Lighting, Movement, and Color Grading.
-*   **Learning Vector**: Toggle between the **📸 Real-World Frame** (authentic photography showing real light behaviors) and the **🧪 Axis Simulator** (interactive mathematical SVG renderers where adjusting parameters like focal length, aperture focus fields, or lights alters the diagram in real time).
+```bash
+cp .env.example .env   # then paste your key into GEMINI_API_KEY
+npm install
+npm run dev            # http://127.0.0.1:3000
+```
 
-### Stage 2: Compose with Structural Formulas 🏗️
-*   **Where**: Tab **`02. FORMULA LAB`** (second tab)
-*   **Action**: Assemble a director's camera recipe by picking and tweaking attributes across lens, camera angle, framing, lighting style, camera motion, and film stock emulation.
-*   **Learning Vector**: See how professional directors stack instructions. Learn the exact sequence: *[Subject/Action] + [Lens Profile] + [Angle Profile] + [Framing Boundary] + [Lighting Chiaroscuro] + [Steadicam Motion] + [Film Emulation Embellishment]*.
+Get a free key at <https://aistudio.google.com/apikey>. Without a key, the glossary, diagrams, Formula Lab, and export still work; the AI features say a key is needed.
 
-### Stage 3: Supercharge Raw Thoughts 🚀
-*   **Where**: Tab **`03. AI SUPERCHARGER`** (third tab)
-*   **Action**: Type a simple, raw visual sentence (e.g., *"a fast car on a rainy night"*), choose from quick test presets, or transfer from the Formula Lab, and click **LAUNCH GEMINI 3.8 FLASH**.
-*   **Learning Vector**: Study the output. Powered by `gemini-3.8-flash`, review the **Optimized Prompt** and watch the **Critique Matrix** to understand what technical descriptors were missing, why they were missing, and how adding precise details like "anamorphic blue lens flares" or "Rembrandt lighting catchlights" builds photorealism.
+## Models and cost
 
-### Stage 4: Battle in the Practice Arena 🏆
-*   **Where**: Tab **`04. PRACTICE ARENA`** (fourth tab)
-*   **Action**: Pick a challenge card (e.g., *Dramatic Boxing Silhouette* or *Vibrant Retro Cyberpunk Night*). Draft an answer prompt or click **Load Sample Draft**, and submit it for evaluation.
-*   **Learning Vector**: The **Dean of Photography** (powered by `gemini-3.8-flash`) scores your output from 0 to 100, checking for concept matches, identifying crucial omissions, giving an analytical director's critique, and providing the **Optimal Blueprint** to compare against.
+- **Text features** (Supercharger, Practice grading, A/B image comparison) use `gemini-3.8-flash`, falling back to `gemini-3.7-flash` when it's busy. Both are on Gemini's **free tier**. Override with `TEXT_MODEL` / `FALLBACK_TEXT_MODEL`.
+- **Image generation** uses `gemini-3.1-flash-lite-image` (override with `IMAGE_MODEL`). Google's image models have **no free tier**, so this only works once billing is enabled on your AI Studio project (about $0.03 per image). Set `IMAGE_GENERATION=off` to hide it.
+- **Free route for images:** copy a prompt into the [Gemini app](https://gemini.google.com/app), save the picture, and upload it to the A/B Lab or Practice tab. Gemini 3.8 Flash (free) compares or grades it.
 
----
+Check your usage and limits at <https://aistudio.google.com/rate-limit>. The app also caps itself at 12 text requests and 6 image requests per minute.
 
-## ☁️ Programmatic Export System ⚙️
+## Privacy
 
-Once you have mastered prompt-building inside the app, export your setups using tab **`05. EXPORT SKILL`**:
-*   **Markdown Skill Block**: A bite-sized visual prompting reference sheet to feed directly into your dynamic system context.
-*   **System Instructions**: A professional custom profile config to paste inside custom ChatGPT Agents, Claude Projects, or system instructions.
-*   **JSON Schema**: Structured key-value properties to feed directly into program backends or image generator endpoints.
+The server listens on `127.0.0.1` only, so other devices on your network can't use your API key. Set `HOST=0.0.0.0` to change that; Cloud Run deployments (AI Studio) do this automatically. Your drafts, formula, and scores are saved in your browser's local storage. Generated images are cached in `.cache/images/`.
 
----
+## Scripts
 
-## 🔑 AI Integration & Local Migration
-
-This application utilizes a robust, full-stack (**Express + React + Vite**) architecture. It communicates securely with the Gemini API server-side to prevent secrets from leaking into client-side browser inspect panels.
-
-### Running Live Locally or on Antigravity/GitHub
-If you clone this repository to your laptop, GitHub, or another hosting container, the application remains fully functional:
-
-1.  **Duplicate Env Template**: In the root of your project, copy `.env.example` to a new file named `.env`:
-    ```bash
-    cp .env.example .env
-    ```
-2.  **Add Your Key**: Edit `.env` and paste your Google AI Studio Gemini API key:
-    ```env
-    GEMINI_API_KEY="AIzaSyYourActualSecureGeminiKeyHere"
-    ```
-3.  **Boot the System**:
-    ```bash
-    npm install
-    npm run dev
-    ```
-
-### 🧠 Extreme Resilience (Offline/No-Key Fallback)
-If you run the app locally without an API key:
-*   The application **will not crash**.
-*   It automatically enters an **Offline Sandbox Mode**.
-*   The **Interactive Glossary**, **Axis Simulators**, **Formula Builder**, and **Spec Exporter** operate at 100% capacity client-side.
-*   The **Optimizer** and **Arena** fall back to local structural algorithms, giving you standard structural mock grades and helpful camera outline recipes so you can continue learning seamlessly without external dependencies.
-
----
-
-## 📈 Gemini API Free Tier Rate Limits (2026 Reference)
-
-If you are using a standard Developer API Key under the **Free Tier** from Google AI Studio, your requests are subject to the following limits:
-
-| Limit Category | Rate | Action on Over-Limit |
-| :--- | :--- | :--- |
-| **Requests Per Minute (RPM)** | **15 RPM** | Temporary `429 Rate Limit Exceeded` (Wait 60s and retry) |
-| **Tokens Per Minute (TPM)** | **1 Million TPM** | Resets every minute |
-| **Requests Per Day (RPD)** | **1,500 RPD** | Resets daily at UTC midnight |
-
-### 🛠️ How to Handle/Lift Limits:
-*   **In-App Resilience**: The backend handles rate limits, providing a clean alert if your quota is exhausted.
-*   **Upgrade to Pay-As-You-Go**: To eliminate these caps and remove promotional headers, switch your Google AI Studio project to your billing plan. The Pay-As-You-Go Tier allows significantly higher throughput (up to 1,000+ RPM) with highly competitive token rates.
+- `npm run dev`: dev server with hot reload
+- `npm run build` then `npm start`: production build
+- `npm run lint`: type-check

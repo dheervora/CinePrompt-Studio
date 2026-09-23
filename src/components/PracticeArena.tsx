@@ -1,343 +1,234 @@
 import React, { useState } from 'react';
-import { MOCK_CHALLENGES } from '../photographyData';
-import { QuizChallenge, QuizGrade } from '../types';
-import { Award, Trophy, Sparkles, BookOpen, CheckCircle, XCircle, AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { Award, BookOpen, Wand2 } from 'lucide-react';
+import { ApiError, modelLabel, postJson, UploadedImage } from '../api';
+import { CHALLENGES, TERM_BY_ID } from '../photographyData';
+import { GradeResult, Health } from '../types';
+import { usePersistentState } from '../usePersistentState';
+import { Button, Callout, CopyButton, cx, Eyebrow, ImageDrop, inputClass, LevelBadge, Panel, PromptBox, selectableClass } from './ui';
 
-export default function PracticeArena() {
-  const [selectedChallenge, setSelectedChallenge] = useState<QuizChallenge>(MOCK_CHALLENGES[0]);
-  const [userPromptAnswer, setUserPromptAnswer] = useState('');
+interface ArenaState {
+  selectedId: string;
+  drafts: Record<string, string>;
+  results: Record<string, GradeResult>;
+  best: Record<string, number>;
+}
+
+const scoreTone = (score: number) => (score >= 80 ? 'text-good' : score >= 55 ? 'text-warn' : 'text-bad');
+const scoreLabel = (score: number) => (score >= 80 ? 'Excellent: this would produce the look.' : score >= 55 ? 'Getting there: a few key choices are missing.' : 'Early days: the prompt misses most of the look.');
+
+export default function PracticeArena({ health, onHealthChange, onOpenTerm }: { health: Health | null; onHealthChange: () => void; onOpenTerm: (id: string) => void }) {
+  const [state, setState] = usePersistentState<ArenaState>('cp-arena', { selectedId: CHALLENGES[0].id, drafts: {}, results: {}, best: {} });
+  const [image, setImage] = useState<UploadedImage | null>(null);
+  const [generated, setGenerated] = useState<{ id: string; url: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [errorString, setErrorString] = useState<string | null>(null);
-  const [gradeResult, setGradeResult] = useState<QuizGrade | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSelectChallenge = (challenge: QuizChallenge) => {
-    setSelectedChallenge(challenge);
-    setUserPromptAnswer('');
-    setGradeResult(null);
-    setErrorString(null);
+  const challenge = CHALLENGES.find((c) => c.id === state.selectedId) ?? CHALLENGES[0];
+  const draft = state.drafts[challenge.id] ?? '';
+  const result = state.results[challenge.id];
+  const canGenerate = health?.hasKey && challenge.kind === 'image' && health.imageStatus !== 'needs_billing' && health.imageStatus !== 'disabled';
+
+  const select = (id: string) => {
+    setState((s) => ({ ...s, selectedId: id }));
+    setImage(null);
+    setGenerated(null);
+    setError(null);
+  };
+  const setDraft = (text: string) => setState((s) => ({ ...s, drafts: { ...s.drafts, [challenge.id]: text } }));
+
+  const generate = async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      setGenerated(await postJson('/api/generate-image', { prompt: draft, aspectRatio: '3:2' }));
+      setImage(null);
+    } catch (e: any) {
+      if (e instanceof ApiError && e.code === 'needs_billing') onHealthChange();
+      setError(e.message);
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  const handleSubmitQuiz = async () => {
-    if (!userPromptAnswer.trim()) return;
-
+  const submit = async () => {
     setLoading(true);
-    setErrorString(null);
-    setGradeResult(null);
-
+    setError(null);
     try {
-      const response = await fetch('/api/grade-prompt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          challengeTitle: selectedChallenge.title,
-          challengeDesc: selectedChallenge.description,
-          requiredElements: selectedChallenge.requiredElements,
-          userPrompt: userPromptAnswer
-        })
+      const grade = await postJson<GradeResult>('/api/grade-prompt', {
+        challengeId: challenge.id,
+        userPrompt: draft,
+        image: generated ? { generatedId: generated.id } : image ? { mimeType: image.mimeType, data: image.data } : undefined,
       });
-
-      if (!response.ok) {
-        throw new Error(`Server graded failure state: ${response.status}`);
-      }
-
-      const data = await response.json();
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      setGradeResult(data);
-    } catch (err: any) {
-      console.error("Grading failed:", err);
-      setErrorString(err.message || "Unable to submit prompt for grading. Please retry.");
+      setState((s) => ({
+        ...s,
+        results: { ...s.results, [challenge.id]: grade },
+        best: { ...s.best, [challenge.id]: Math.max(grade.score, s.best[challenge.id] ?? 0) },
+      }));
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Helper styling for overall scores
-  const getScoreColor = (score: number) => {
-    if (score >= 90) return { text: "text-emerald-400", border: "border-emerald-500/30", bg: "bg-emerald-950/20" };
-    if (score >= 75) return { text: "text-amber-400", border: "border-amber-500/30", bg: "bg-amber-950/20" };
-    return { text: "text-rose-400", border: "border-rose-500/30", bg: "bg-rose-950/20" };
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-      {/* LEFT COLUMN: Challenges selector & input block (Col span 7) */}
-      <div className="lg:col-span-7 bg-[#0A0A0A] p-6 rounded-none border border-white/10 shadow-lg space-y-6 text-left">
-        <div>
-          <h3 className="font-display font-black text-lg text-white flex items-center gap-2 uppercase tracking-tight">
-            <Trophy className="w-5 h-5 text-[#F27D26]" />
-            Chamber Arena: Technical Arena
-          </h3>
-          <p className="text-xs text-white/50 font-sans mt-0.5 uppercase tracking-wide">
-            Test your cinematographic eye. Write a prompt to match the target scene and score high marks!
-          </p>
-        </div>
-
-        {/* Challenge Selection Tabs */}
-        <div className="space-y-2">
-          <label className="text-[10px] font-mono font-black text-[#F27D26] uppercase tracking-[0.2em] block">
-            Select Practice Challenge Matrix
-          </label>
-          <div className="flex flex-col sm:flex-row gap-2.5">
-            {MOCK_CHALLENGES.map((challenge) => {
-              const isActive = selectedChallenge.id === challenge.id;
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="lg:col-span-7 space-y-5">
+        <Panel className="space-y-3">
+          <p className="text-muted">Each brief describes a look in everyday words. Your job is to write the prompt that would produce it, using the right techniques.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5" role="radiogroup" aria-label="Challenges">
+            {CHALLENGES.map((c) => {
+              const best = state.best[c.id];
               return (
-                <button
-                  key={challenge.id}
-                  onClick={() => handleSelectChallenge(challenge)}
-                  className={`p-3.5 rounded-none border text-left cursor-pointer transition-all flex-1 ${
-                    isActive 
-                      ? 'bg-white text-black border-white shadow-md' 
-                      : 'bg-black hover:bg-white/5 border-white/10 text-white/70'
-                  }`}
-                >
-                  <span className={`text-[8px] font-mono font-black uppercase px-2 py-0.5 rounded-none tracking-widest ${
-                    isActive ? 'bg-[#F27D26] text-black' : 'bg-white/10 text-white/95'
-                  }`}>
-                    {challenge.category}
+                <button key={c.id} type="button" role="radio" aria-checked={c.id === challenge.id} onClick={() => select(c.id)} className={cx(selectableClass(c.id === challenge.id), 'p-3.5 space-y-1.5')}>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-display font-bold text-ink">{c.title}</span>
+                    {best !== undefined && <span className={cx('text-sm font-semibold tabular-nums', scoreTone(best))}>Best {best}</span>}
                   </span>
-                  <p className="font-display font-black text-xs mt-2.5 tracking-tight uppercase leading-tight">{challenge.title}</p>
+                  <span className="flex items-center gap-2 flex-wrap text-xs text-muted">
+                    <LevelBadge level={c.level} /> {c.focus}{c.kind === 'video' && ' · video'}
+                  </span>
                 </button>
               );
             })}
           </div>
-        </div>
+        </Panel>
 
-        {/* Selected Challenge Detail Cards */}
-        <div className="bg-black border border-white/10 p-5 rounded-none space-y-4">
-          <div className="space-y-1">
-            <h4 className="font-mono text-[10px] font-black uppercase tracking-widest text-[#F27D26]">
-              Active Objective: <span className="text-white font-display font-black">{selectedChallenge.title.toUpperCase()}</span>
-            </h4>
-            <p className="text-xs text-white/70 leading-relaxed font-sans mt-2">{selectedChallenge.description}</p>
+        <Panel className="space-y-5">
+          <div className="space-y-2">
+            <Eyebrow>The brief</Eyebrow>
+            <h2 className="text-xl font-bold">{challenge.title}</h2>
+            <p className="text-ink leading-relaxed">{challenge.brief}</p>
+            <p className="text-sm text-subtle">Think about: {challenge.kind === 'video' ? 'how the camera moves, the shot size, the lens, the light, and the color.' : 'the light (quality and direction), shot size and angle, lens and focus, composition, and color.'}</p>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-white/10">
-            <span className="text-[9px] font-black text-white/40 uppercase font-mono tracking-widest block">
-              Required Cinematic Vocals:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {selectedChallenge.requiredElements.map((el, i) => (
-                <span key={i} className="text-[10px] font-mono text-white bg-white/5 border border-white/10 rounded-none px-2.5 py-1 uppercase tracking-wider">
-                  ⭐ {el}
-                </span>
-              ))}
-            </div>
-            <p className="text-[10px] text-white/40 font-mono uppercase tracking-wider leading-relaxed pt-1.5">
-              Note: You do not have to match words exactly. Director AI evaluates conceptual alignment.
-            </p>
+          <div className="space-y-1.5">
+            <label htmlFor="arena-answer" className="text-sm font-semibold">Your {challenge.kind} prompt</label>
+            <textarea id="arena-answer" rows={6} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Describe the scene, then the light, framing, lens and color…" className={cx(inputClass, 'resize-y')} />
           </div>
-        </div>
 
-        {/* User Input Block */}
-        <div className="space-y-2">
-          <div className="flex justify-between items-center">
-            <label className="text-[10px] font-mono font-black text-[#F27D26] uppercase tracking-[0.2em] block">
-              Draft your Photographic Prompt Answer
-            </label>
-            {selectedChallenge.sampleSolution && (
-              <button
-                type="button"
-                onClick={() => setUserPromptAnswer(selectedChallenge.sampleSolution)}
-                className="text-[9px] font-mono text-white/60 hover:text-[#F27D26] transition-colors uppercase underline cursor-pointer"
-              >
-                Load Sample Draft
-              </button>
-            )}
-          </div>
-          <textarea
-            placeholder="A low-key portrait of a boxer sitting on a..."
-            value={userPromptAnswer}
-            onChange={(e) => setUserPromptAnswer(e.target.value)}
-            className="w-full bg-black hover:bg-neutral-900/50 p-4 font-mono text-xs text-white rounded-none border border-white/15 focus:border-[#F27D26] focus:outline-none h-36 border-dashed uppercase"
-          />
-        </div>
-
-        {/* Buttons */}
-        <div className="flex justify-end gap-3 pt-2">
-          {gradeResult && (
-            <button
-              onClick={() => { setUserPromptAnswer(''); setGradeResult(null); }}
-              className="px-4 py-2 border border-white/10 bg-white/5 hover:bg-white/10 text-white font-black font-mono tracking-widest text-[9px] rounded-none cursor-pointer transition-colors uppercase"
-            >
-              CLEAR ANSWER
-            </button>
-          )}
-
-          <button
-            onClick={handleSubmitQuiz}
-            disabled={loading || !userPromptAnswer.trim()}
-            className="px-6 py-3 bg-[#F27D26] hover:bg-white disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed text-black font-black font-mono tracking-widest text-[10px] rounded-none cursor-pointer shadow-md transition-all flex items-center gap-2 uppercase"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>EVALUATING SOLUTION...</span>
-              </>
-            ) : (
-              <>
-                <Award className="w-4 h-4" />
-                <span>SUBMIT FOR EVALUATION</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Error Notification */}
-        {errorString && (
-          <div className="bg-[#1A0B0E] border border-red-900 p-4 rounded-none text-red-100 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-              <div className="text-xs space-y-1 leading-normal font-sans">
-                <span className="font-bold uppercase tracking-wider text-red-400">Gemini Grading Notice:</span>
-                <p className="text-white/80">{errorString}</p>
-                <p className="text-[9px] text-red-400 font-mono uppercase tracking-wider mt-1">
-                  Tip: Rate limits or momentary server spikes pass quickly. Click retry to re-evaluate.
-                </p>
+          {challenge.kind === 'image' && (
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Optional: add the picture your prompt makes</p>
+              <p className="text-sm text-muted">
+                {canGenerate
+                  ? 'Generate it here (a paid feature), or upload one you made elsewhere. The teacher will point out what matches the brief.'
+                  : 'Paste your prompt into the free Gemini app, save the picture, and add it here. The teacher will point out what matches the brief.'}
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+                {generated ? (
+                  <figure className="space-y-1">
+                    <img src={generated.url} alt="Generated from your prompt" className="w-full rounded-md border border-line" />
+                    <button type="button" onClick={() => setGenerated(null)} className="text-sm text-muted hover:text-ink cursor-pointer">Remove</button>
+                  </figure>
+                ) : (
+                  <ImageDrop label="Your generated image" image={image} onChange={setImage} />
+                )}
+                {canGenerate && !generated && (
+                  <Button onClick={generate} loading={generating} disabled={!draft.trim()}>
+                    <Wand2 className="w-4 h-4" aria-hidden="true" /> Generate from my prompt
+                  </Button>
+                )}
               </div>
             </div>
-            <button
-              onClick={handleSubmitQuiz}
-              className="px-3.5 py-1.5 bg-red-950/80 hover:bg-white hover:text-black border border-red-500/40 text-red-200 text-[10px] font-mono font-bold uppercase tracking-widest transition-colors shrink-0 cursor-pointer"
-            >
-              Retry
-            </button>
+          )}
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Button variant="primary" onClick={submit} loading={loading} disabled={!draft.trim() || !health?.hasKey}>
+              {!loading && <Award className="w-4 h-4" aria-hidden="true" />} {loading ? 'Grading…' : 'Get feedback'}
+            </Button>
+            {draft && <Button variant="ghost" onClick={() => setDraft('')}>Clear</Button>}
+            {!health?.hasKey && health && <span className="text-sm text-subtle">Grading needs a Gemini API key.</span>}
           </div>
-        )}
+
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted hover:text-ink">Stuck? Show a sample answer</summary>
+            <div className="mt-2 space-y-2">
+              <PromptBox>{challenge.sampleSolution}</PromptBox>
+              <Button size="sm" onClick={() => setDraft(challenge.sampleSolution)}>Use as my draft</Button>
+            </div>
+          </details>
+        </Panel>
       </div>
 
-      {/* RIGHT COLUMN: Grade Card & Suggested prompt (Col span 5) */}
-      <div className="lg:col-span-5 space-y-6">
-        <div className="bg-[#0A0A0A] p-6 rounded-none border border-white/10 shadow-lg text-left space-y-6 sticky top-4">
-          <div className="border-b border-white/10 pb-3 flex justify-between items-center text-[9px] text-white/50 font-mono uppercase tracking-widest">
-            <span className="flex items-center gap-1.5">
-              <span>EXAM REVIEW BOARD</span>
-              <span className="text-emerald-400 font-bold bg-emerald-950/60 border border-emerald-500/30 px-1.5 py-0.2">3.8 Flash</span>
-            </span>
-            <span className="text-[#F27D26] font-black">Dean of Photography</span>
+      <div className="lg:col-span-5 lg:sticky" style={{ top: 'calc(var(--chrome-h) + 16px)' }}>
+        <Panel as="aside" aria-label="Feedback" aria-live="polite" className="space-y-5 lg:overflow-y-auto" style={{ maxHeight: 'calc(100vh - var(--chrome-h) - 32px)' }}>
+          <div className="flex items-center justify-between gap-2">
+            <Eyebrow>Feedback</Eyebrow>
+            {health?.hasKey && <span className="text-xs text-subtle">{modelLabel(health.textModel)}</span>}
           </div>
 
-          {!loading && !gradeResult && !errorString && (
-            <div className="py-16 text-center space-y-3 p-4">
-              <BookOpen className="w-10 h-10 text-white/10 mx-auto" />
-              <h4 className="font-mono text-white/40 text-xs uppercase tracking-widest">Grading Portal Dormant</h4>
-              <p className="text-white/60 text-xs leading-relaxed max-w-xs mx-auto font-sans">
-                Review the target scenario, check your required elements, draft your prompt, and click <span className="font-semibold text-white">"SUBMIT"</span> to receive score breakdown.
-              </p>
+          {error && <Callout kind="error" action={<Button size="sm" onClick={submit}>Try again</Button>}>{error}</Callout>}
+
+          {loading && <p className="text-muted py-10 text-center">Reading your prompt against the brief…</p>}
+
+          {!loading && !result && !error && (
+            <div className="py-10 text-center space-y-2">
+              <BookOpen className="w-8 h-8 text-subtle mx-auto" aria-hidden="true" />
+              <p className="text-muted">Write your prompt and select "Get feedback". You'll get a score in five areas, what's missing, and an improved version.</p>
             </div>
           )}
 
-          {loading && (
-            <div className="py-16 text-center space-y-4">
-              <div className="flex justify-center">
-                <Loader2 className="w-10 h-10 text-[#F27D26] animate-spin" />
-              </div>
-              <p className="text-white font-bold font-mono text-xs uppercase tracking-widest animate-pulse">
-                Evaluating structural camera vocabulary...
-              </p>
-              <p className="text-[9px] text-white/40 font-mono uppercase tracking-wider">
-                Director AI is examining focal points, illumination ratios, and keyword robustness.
-              </p>
-            </div>
-          )}
-
-          {/* Grading Output Result */}
-          {gradeResult && !loading && (
-            <div className="space-y-6">
-              
-              {/* Score visual metric */}
+          {!loading && result && (
+            <div className="space-y-5">
               <div className="flex items-center gap-4">
-                <div className={`w-16 h-16 rounded-none border-2 flex items-center justify-center font-display font-black text-2xl shadow-xl ${
-                  getScoreColor(gradeResult.score).text
-                } ${
-                  getScoreColor(gradeResult.score).border
-                } ${
-                  getScoreColor(gradeResult.score).bg
-                }`}>
-                  {gradeResult.score}
-                </div>
+                <p className={cx('font-display text-5xl font-bold tabular-nums', scoreTone(result.score))}>{result.score}</p>
                 <div>
-                  <h4 className="text-xs font-mono font-black text-white leading-tight uppercase tracking-widest">
-                    Score: {gradeResult.score}/100
-                  </h4>
-                  <p className="text-[11px] text-white/60 font-sans mt-0.5 leading-tight">
-                    {gradeResult.score >= 90 ? "🌟 Cinematographer Excellence rank!" : gradeResult.score >= 75 ? "👍 Balanced configuration" : "⚠️ Needs tighter optical definitions"}
-                  </p>
+                  <p className="text-sm text-subtle">out of 100</p>
+                  <p className="text-ink">{scoreLabel(result.score)}</p>
                 </div>
               </div>
 
-              {/* Matches & Missing list chips */}
-              <div className="space-y-3">
-                {gradeResult.technicalMatch && gradeResult.technicalMatch.length > 0 && (
-                  <div className="space-y-1.5">
-                    <span className="text-[8px] font-mono font-black text-[#F27D26] uppercase tracking-wider flex items-center gap-1 leading-none">
-                      <CheckCircle className="w-3.5 h-3.5 text-[#F27D26] shrink-0" />
-                      INTEGRATED CONCEPT MATCHES
-                    </span>
-                    <div className="flex flex-wrap gap-1.5 pl-4">
-                      {gradeResult.technicalMatch.map((m, idx) => (
-                        <span key={idx} className="text-[9px] font-mono text-[#F2F2F2] bg-white/5 rounded-none px-2 py-0.5 border border-white/10 uppercase">
-                          {m}
-                        </span>
-                      ))}
+              <ul className="space-y-3">
+                {result.criteria.map((c) => (
+                  <li key={c.name} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-ink font-medium">{c.name}</span>
+                      <span className="tabular-nums text-muted">{c.score}/{c.max}</span>
                     </div>
-                  </div>
-                )}
-
-                {gradeResult.omissions && gradeResult.omissions.length > 0 && (
-                  <div className="space-y-1.5">
-                    <span className="text-[8px] font-mono font-black text-white/40 uppercase tracking-wider flex items-center gap-1 leading-none">
-                      <XCircle className="w-3.5 h-3.5 text-white/30 shrink-0" />
-                      UNLOCKING OPPORTUNITIES
-                    </span>
-                    <div className="flex flex-wrap gap-1.5 pl-4">
-                      {gradeResult.omissions.map((o, idx) => (
-                        <span key={idx} className="text-[9px] font-mono text-white/70 bg-white/5 rounded-none px-2 py-0.5 border border-white/5 uppercase">
-                          {o}
-                        </span>
-                      ))}
+                    <div className="h-1.5 rounded-full bg-raised overflow-hidden">
+                      <div className="h-full rounded-full bg-accent" style={{ width: `${(c.score / c.max) * 100}%` }} />
                     </div>
-                  </div>
-                )}
+                    <p className="text-sm text-muted">{c.comment}</p>
+                  </li>
+                ))}
+              </ul>
+
+              {result.strengths?.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-good">What worked</p>
+                  <ul className="list-disc pl-5 text-sm text-muted space-y-0.5">{result.strengths.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                </div>
+              )}
+              {result.missing?.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-warn">What to add</p>
+                  <ul className="list-disc pl-5 text-sm text-muted space-y-0.5">{result.missing.map((s, i) => <li key={i}>{s}</li>)}</ul>
+                </div>
+              )}
+              {result.imageFeedback && <Callout kind="info" title="About your image">{result.imageFeedback}</Callout>}
+              <p className="text-muted">{result.critique}</p>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">Improved version</p>
+                  <CopyButton text={result.suggestedPrompt} />
+                </div>
+                <PromptBox>{result.suggestedPrompt}</PromptBox>
               </div>
 
-              {/* Summary critique */}
-              <div className="bg-black border border-white/10 p-4 rounded-none text-xs text-white/80 leading-relaxed font-sans">
-                <span className="font-mono font-black text-[9px] uppercase tracking-widest text-[#F27D26] flex items-center gap-1 mb-1.5 leading-none">
-                  <AlertCircle className="w-3.5 h-3.5 text-[#F27D26] shrink-0" />
-                  Dean's Critique:
-                </span>
-                <p className="mt-1">{gradeResult.critique}</p>
-                {gradeResult.grammarFeedback && (
-                  <p className="mt-2.5 text-[9px] text-[#F27D26] font-mono uppercase tracking-wider select-none pt-1.5 border-t border-white/5">
-                    Structure: {gradeResult.grammarFeedback}
-                  </p>
-                )}
+              <div className="space-y-2 border-t border-line pt-4">
+                <p className="text-sm font-semibold">Techniques this brief was describing</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {challenge.answerTermIds.map((id) => TERM_BY_ID[id] && (
+                    <Button key={id} size="sm" onClick={() => onOpenTerm(id)}>{TERM_BY_ID[id].name}</Button>
+                  ))}
+                </div>
               </div>
-
-              {/* Model optimal answer sheet */}
-              <div className="bg-black border border-[#F27D26]/20 p-4 rounded-none text-white space-y-2">
-                <span className="text-[9px] font-bold text-[#F27D26] font-mono uppercase tracking-widest block">
-                  Dean's Optimal Blueprint Answer:
-                </span>
-                <p className="text-xs font-mono text-white/90 leading-relaxed select-all">
-                  {gradeResult.suggestedPrompt}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleSelectChallenge(selectedChallenge)}
-                className="w-full text-center py-2.5 border border-[#F27D26]/25 hover:border-white text-[#F27D26] hover:text-white bg-transparent text-[9px] font-bold font-mono tracking-widest rounded-none hover:bg-white/5 transition-colors flex items-center justify-center gap-1 cursor-pointer uppercase"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>RETRY CONFLICT MATRIX</span>
-              </button>
             </div>
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );

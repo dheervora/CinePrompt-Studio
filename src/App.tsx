@@ -1,303 +1,184 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { BookOpen, Camera, Download, FlaskConical, Sliders, Sparkles, Trophy, X } from 'lucide-react';
 import InteractiveGlossary from './components/InteractiveGlossary';
 import PromptBuilder from './components/PromptBuilder';
+import ABLab from './components/ABLab';
 import PromptOptimizer from './components/PromptOptimizer';
 import PracticeArena from './components/PracticeArena';
 import AgentExporter from './components/AgentExporter';
-import { PromptFormula } from './types';
-import { Camera, BookOpen, Sliders, Sparkles, Cpu, Trophy, Code2, AlertCircle, RefreshCw } from 'lucide-react';
+import { cx } from './components/ui';
+import { modelLabel, useHealth } from './api';
+import { CATEGORIES, PHOTOGRAPHY_TERMS } from './photographyData';
+import { EMPTY_FORMULA, FORMULA_FIELD_BY_CATEGORY, promptText } from './prompting';
+import { PhotoTerm, PromptFormula, PromptTarget } from './types';
+import { usePersistentState } from './usePersistentState';
 
-const defaultFormula: PromptFormula = {
-  subject: "",
-  lensId: "",
-  angleId: "",
-  framingId: "",
-  lightingId: "",
-  movementId: "",
-  colorGradeId: "",
-  filmStock: "",
-  aspectRatio: "--ar 16:9",
-  customNotes: ""
-};
+type Tab = 'glossary' | 'builder' | 'lab' | 'supercharger' | 'practice' | 'export';
+
+const TABS: Array<{ id: Tab; label: string; icon: React.ElementType; title: string; intro: string }> = [
+  { id: 'glossary', label: 'Glossary', icon: BookOpen, title: 'Photography glossary', intro: `${PHOTOGRAPHY_TERMS.length} terms in ${CATEGORIES.length} topics, ordered as a learning path. Start with the "Start here" basics, use the diagrams to see each effect, and add terms to your prompt.` },
+  { id: 'builder', label: 'Formula Lab', icon: Sliders, title: 'Formula Lab', intro: 'Build a prompt one decision at a time. Each color in the preview shows which choice wrote which words.' },
+  { id: 'lab', label: 'A/B Lab', icon: FlaskConical, title: 'A/B Lab', intro: 'Change one setting and compare the two pictures. Seeing the difference is how the vocabulary sticks.' },
+  { id: 'supercharger', label: 'Supercharger', icon: Sparkles, title: 'AI Supercharger', intro: 'Turn a rough idea into a precise prompt, and see exactly what was added and why.' },
+  { id: 'practice', label: 'Practice', icon: Trophy, title: 'Practice Arena', intro: 'Read a brief, write the prompt, and get scored feedback on light, lens, framing, and color.' },
+  { id: 'export', label: 'Export', icon: Download, title: 'Export', intro: 'Save the glossary as a cheat sheet, as AI assistant instructions, or as data.' },
+];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'glossary' | 'builder' | 'optimizer' | 'practice' | 'exporter'>('glossary');
-  const [formula, setFormula] = useState<PromptFormula>(defaultFormula);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [tab, setTab] = usePersistentState<Tab>('cp-tab', 'glossary');
+  const [formula, setFormula] = usePersistentState<PromptFormula>('cp-formula', EMPTY_FORMULA);
+  const [target, setTarget] = usePersistentState<PromptTarget>('cp-target', 'gemini');
+  const [health, refreshHealth] = useHealth();
+  const [toast, setToast] = useState<{ message: string; tab: Tab } | null>(null);
+  const toastTimer = useRef<number | undefined>(undefined);
+  const [focusTermId, setFocusTermId] = useState<string | null>(null);
+  const [labSeed, setLabSeed] = useState<string | null>(null);
+  const [incoming, setIncoming] = useState<{ text: string; nonce: number } | null>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const handleAddTermToFormula = (category: string, value: string) => {
-    setFormula((prev) => {
-      const fieldIdMap: Record<string, keyof PromptFormula> = {
-        lenses: 'lensId',
-        angles: 'angleId',
-        framing: 'framingId',
-        lighting: 'lightingId',
-        movements: 'movementId',
-        'color-film': 'colorGradeId'
-      };
+  const current = TABS.find((t) => t.id === tab) ?? TABS[0];
 
-      const targetField = fieldIdMap[category];
-      if (!targetField) return prev;
-
-      return {
-        ...prev,
-        [targetField]: value
-      };
-    });
-
-    // Provide premium reactive popup indicator
-    setToastMessage(`Term compiled into ${category} formula register!`);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 2800);
+  const go = (next: Tab) => {
+    setTab(next);
+    window.scrollTo({ top: 0 });
   };
 
-  const handleTriggerOptimization = () => {
-    // Navigates directly to prompt optimizer with our drafted string ready!
-    setActiveTab('optimizer');
+  useEffect(() => {
+    tabRefs.current[tab]?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [tab]);
+
+  const showToast = (message: string, target: Tab) => {
+    window.clearTimeout(toastTimer.current);
+    setToast({ message, tab: target });
+    toastTimer.current = window.setTimeout(() => setToast(null), 4000);
   };
 
-  const compileQuickDraft = () => {
-    // Simple mock of compiled state to show in toast or optimizer
-    const parts = [
-      formula.subject.trim() || "[Core Subject]",
-      formula.lensId ? "lens: " + formula.lensId.replace('lens-', '') : "",
-      formula.lightingId ? "lighting: " + formula.lightingId.replace('lighting-', '') : "",
-      formula.colorGradeId ? "style: " + formula.colorGradeId.replace('color-', '') : ""
-    ].filter(Boolean);
-    return parts.join(', ');
+  const addTerm = (term: PhotoTerm) => {
+    setFormula((prev) => ({ ...prev, [FORMULA_FIELD_BY_CATEGORY[term.category]]: term.id }));
+    if (term.category === 'movements') setTarget('veo');
+    showToast(`Added "${term.name}" to the Formula Lab.`, 'builder');
   };
+
+  const openTerm = (id: string) => {
+    setFocusTermId(id);
+    go('glossary');
+  };
+
+  const tryInLab = (term: PhotoTerm) => {
+    setLabSeed(term.id);
+    go('lab');
+  };
+
+  const sendToSupercharger = (text: string) => {
+    setIncoming({ text, nonce: Date.now() });
+    go('supercharger');
+  };
+
+  const aiStatus = !health
+    ? { dot: 'bg-subtle', text: 'Checking AI…', short: 'AI…' }
+    : health.hasKey
+      ? { dot: 'bg-good', text: `AI: ${modelLabel(health.textModel)}`, short: 'AI on' }
+      : { dot: 'bg-warn', text: 'AI off: no API key', short: 'AI off' };
 
   return (
-    <div className="min-h-screen flex flex-col font-sans text-[#F2F2F2] bg-[#050505] select-none antialiased">
-      {/* Dynamic Slide-in Toast Alert in Editorial theme */}
-      {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-[#0A0A0A] border-2 border-[#F27D26] text-[#F2F2F2] font-mono text-xs py-3 px-5 rounded-none shadow-2xl transition-all">
-          <Sparkles className="w-4 h-4 text-[#F27D26] animate-pulse" />
-          <span className="font-extrabold uppercase tracking-wider">{toastMessage}</span>
-          <button 
-            onClick={() => setActiveTab('builder')}
-            className="ml-3 text-[#F27D26] underline hover:text-white text-[11px] font-bold uppercase tracking-widest"
-          >
-            EDIT FORMULA
-          </button>
-        </div>
-      )}
+    <div className="min-h-screen flex flex-col">
+      <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-accent text-black px-3 py-2 rounded-md">Skip to content</a>
 
-      {/* Header section in Dark Editorial masterclass style */}
-      <header className="bg-[#050505] border-b border-white/10 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 h-20 flex flex-col sm:flex-row justify-between items-center py-4 sm:py-0 gap-4">
-          
-          {/* Logo brand */}
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-[#F27D26] text-black flex items-center justify-center font-black rounded-none shadow-md">
-              <Camera className="w-6 h-6 stroke-[2.5]" />
+      <header className="border-b border-line">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 bg-accent text-black rounded-md flex items-center justify-center shrink-0">
+              <Camera className="w-5 h-5" aria-hidden="true" />
             </div>
-            <div className="text-left">
-              <span className="text-[10px] uppercase tracking-[0.25em] text-[#F27D26] font-bold block leading-none mb-1">CinePrompt MASTERCLASS v.21</span>
-              <h1 className="font-display font-black text-white text-2xl tracking-tighter leading-none uppercase">
-                Visual Vocabulary
-              </h1>
+            <div className="min-w-0">
+              <p className="font-display font-bold text-lg leading-tight">CinePrompt Studio</p>
+              <p className="text-xs text-muted truncate">Learn photography terms, then prompt with them</p>
             </div>
           </div>
-
-          {/* Quick clinical stats strips */}
-          <div className="hidden md:flex items-center gap-6 font-mono text-[11px] uppercase tracking-wider">
-            <div className="text-right">
-              <span className="text-white/40 block text-[9px] font-extrabold mb-0.5">LECTURE INDEX</span>
-              <span className="text-white font-bold">18 Concept Blocks</span>
-            </div>
-            <div className="h-6 w-px bg-white/10"></div>
-            <div className="text-right">
-              <span className="text-white/40 block text-[9px] font-extrabold mb-0.5">EXAM BOARD</span>
-              <span className="text-[#F27D26] font-bold">Active Quiz Desk</span>
-            </div>
-            <div className="h-6 w-px bg-white/10"></div>
-            <div className="text-right">
-              <span className="text-white/40 block text-[9px] font-extrabold mb-0.5">INTELLIGENCE</span>
-              <span className="text-white font-extrabold">Gemini 3.5 AI</span>
-            </div>
-          </div>
+          <p className="flex items-center gap-2 text-xs text-muted whitespace-nowrap" title={health ? `Fallback: ${modelLabel(health.fallbackModel)}` : undefined}>
+            <span className={cx('w-2 h-2 rounded-full', aiStatus.dot)} aria-hidden="true" />
+            <span className="sm:hidden">{aiStatus.short}</span>
+            <span className="hidden sm:inline">{aiStatus.text}</span>
+          </p>
         </div>
       </header>
 
-      {/* Sub-Header selector tab bar - Flat Editorial Layout */}
-      <nav className="bg-[#0A0A0A] border-b border-white/10 sticky top-20 z-30 shadow-md">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8">
-          <div className="flex overflow-x-auto gap-1 sm:gap-2 py-0 justify-start scrollbar-hide">
-            
-            <button
-              onClick={() => setActiveTab('glossary')}
-              className={`px-5 py-4 text-xs font-mono font-bold tracking-[0.16em] uppercase rounded-none transition-all flex items-center gap-2 border-b-2 ${
-                activeTab === 'glossary' 
-                  ? 'border-[#F27D26] text-white bg-white/5 font-extrabold' 
-                  : 'border-transparent text-white/40 hover:text-white hover:bg-white-[0.02]'
-              }`}
-            >
-              <BookOpen className="w-4 h-4 text-[#F27D26]" />
-              <span>01. STUDY GLOSSARY</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('builder')}
-              className={`px-5 py-4 text-xs font-mono font-bold tracking-[0.16em] uppercase rounded-none transition-all flex items-center gap-2 border-b-2 ${
-                activeTab === 'builder' 
-                  ? 'border-[#F27D26] text-white bg-white/5 font-extrabold' 
-                  : 'border-transparent text-white/40 hover:text-white hover:bg-white-[0.02]'
-              }`}
-            >
-              <Sliders className="w-4 h-4 text-[#F27D26]" />
-              <span>02. FORMULA LAB</span>
-              {formula.subject && (
-                <span className="w-1.5 h-1.5 rounded-full bg-[#F27D26] animate-pulse"></span>
-              )}
-            </button>
-
-            <button
-              onClick={() => setActiveTab('optimizer')}
-              className={`px-5 py-4 text-xs font-mono font-bold tracking-[0.16em] uppercase rounded-none transition-all flex items-center gap-2 border-b-2 ${
-                activeTab === 'optimizer' 
-                  ? 'border-[#F27D26] text-white bg-white/5 font-extrabold' 
-                  : 'border-transparent text-white/40 hover:text-white hover:bg-white-[0.02]'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-[#F27D26]" />
-              <span>03. AI SUPERCHARGER</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('practice')}
-              className={`px-5 py-4 text-xs font-mono font-bold tracking-[0.16em] uppercase rounded-none transition-all flex items-center gap-2 border-b-2 ${
-                activeTab === 'practice' 
-                  ? 'border-[#F27D26] text-white bg-white/5 font-extrabold' 
-                  : 'border-transparent text-white/40 hover:text-white hover:bg-white-[0.02]'
-              }`}
-            >
-              <Trophy className="w-4 h-4 text-[#F27D26]" />
-              <span>04. PRACTICE ARENA</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('exporter')}
-              className={`px-5 py-4 text-xs font-mono font-bold tracking-[0.16em] uppercase rounded-none transition-all flex items-center gap-2 border-b-2 ${
-                activeTab === 'exporter' 
-                  ? 'border-[#F27D26] text-white bg-white/5 font-extrabold' 
-                  : 'border-transparent text-white/40 hover:text-white hover:bg-white-[0.02]'
-              }`}
-            >
-              <Cpu className="w-4 h-4 text-[#F27D26]" />
-              <span>05. EXPORT SKILL</span>
-            </button>
-
+      <nav className="sticky top-0 z-30 bg-bg/95 backdrop-blur border-b border-line" style={{ height: 'var(--chrome-h)' }} aria-label="Sections">
+        <div className="relative max-w-7xl mx-auto h-full">
+          <div className="flex h-full overflow-x-auto scrollbar-none px-2 sm:px-4" role="tablist">
+            {TABS.map((t) => {
+              const Icon = t.icon;
+              const active = t.id === tab;
+              return (
+                <button
+                  key={t.id}
+                  ref={(el) => { tabRefs.current[t.id] = el; }}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => go(t.id)}
+                  className={cx(
+                    'flex items-center gap-2 px-3 sm:px-4 h-full text-sm font-semibold whitespace-nowrap border-b-2 transition-colors cursor-pointer',
+                    active ? 'border-accent text-ink' : 'border-transparent text-muted hover:text-ink'
+                  )}
+                >
+                  <Icon className={cx('w-4 h-4', active ? 'text-accent' : 'text-subtle')} aria-hidden="true" />
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
+          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-bg to-transparent sm:hidden" aria-hidden="true" />
         </div>
       </nav>
 
-      {/* Main Core Router View Body */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-6 sm:px-8 py-10">
-        
-        {/* Dynamic header description styled with serif quote parameters */}
-        <div className="mb-10 text-left border-l-2 border-[#F27D26] pl-6 max-w-3xl">
-          {activeTab === 'glossary' && (
-            <div className="space-y-1">
-              <span className="text-[12px] uppercase tracking-[0.3em] text-[#F27D26] font-extrabold block">Chapter 01: Core Parameters</span>
-              <h2 className="font-display font-black text-white text-3xl tracking-tighter uppercase">Optics & Illumination Lab</h2>
-              <p className="text-white/60 text-sm leading-relaxed font-serif italic mt-2">
-                "Behind every beautiful shadow is a deliberate physical coordinate. Interact with physical lens standards, lighting placements, and focus ratios to frame high-contrast statements."
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'builder' && (
-            <div className="space-y-1">
-              <span className="text-[12px] uppercase tracking-[0.3em] text-[#F27D26] font-extrabold block">Chapter 02: Formulation</span>
-              <h2 className="font-display font-black text-white text-3xl tracking-tighter uppercase">Parameter Assembly Matrix</h2>
-              <p className="text-white/60 text-sm leading-relaxed font-serif italic mt-2">
-                "Writing a prompt is a technical act. Build structured specifications, balance shadow falloffs, and copy unified prompt vectors directly targeting diffusion systems."
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'optimizer' && (
-            <div className="space-y-1">
-              <span className="text-[12px] uppercase tracking-[0.3em] text-[#F27D26] font-extrabold block">Chapter 03: Expert Review</span>
-              <h2 className="font-display font-black text-white text-3xl tracking-tighter uppercase">Director of Photography AI</h2>
-              <p className="text-white/60 text-sm leading-relaxed font-serif italic mt-2">
-                "Automate vocabulary injection. Our server-side Gemini system evaluates lighting setups, identifies logic inconsistencies, and drafts multi-sentence cinematographic directives."
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'practice' && (
-            <div className="space-y-1">
-              <span className="text-[12px] uppercase tracking-[0.3em] text-[#F27D26] font-extrabold block">Chapter 04: Assessment Portfolio</span>
-              <h2 className="font-display font-black text-white text-3xl tracking-tighter uppercase">The Practice Promenade</h2>
-              <p className="text-white/60 text-sm leading-relaxed font-serif italic mt-2">
-                "Submit solution drafts matching the target visual parameters. Receive instantaneous metrics, score indexes, and professional feedback structured by the masterclass dean."
-              </p>
-            </div>
-          )}
-
-          {activeTab === 'exporter' && (
-            <div className="space-y-1">
-              <span className="text-[12px] uppercase tracking-[0.3em] text-[#F27D26] font-extrabold block">Chapter 05: Deployment Specs</span>
-              <h2 className="font-display font-black text-white text-3xl tracking-tighter uppercase">Programmatic Skill Agent Specification</h2>
-              <p className="text-white/60 text-sm leading-relaxed font-serif italic mt-2">
-                "Translate this masterclass lexicon into clean system guidance. Package the structures into structured Markdown or JSON templates to trigger high-contrast styles natively in external LLMs."
-              </p>
-            </div>
-          )}
+      <main id="main" className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
+        <div className="max-w-3xl space-y-1.5">
+          <h1 className="text-2xl sm:text-3xl font-bold">{current.title}</h1>
+          <p className="text-muted">{current.intro}</p>
         </div>
 
-        {/* Coordinated Subviews hosting state panels */}
-        <div className="space-y-8">
-          {activeTab === 'glossary' && (
-            <InteractiveGlossary onAddTermToFormula={handleAddTermToFormula} />
-          )}
-
-          {activeTab === 'builder' && (
-            <PromptBuilder 
-              initialFormula={formula} 
-              setFormula={setFormula} 
-              onTriggerOptimization={handleTriggerOptimization}
-            />
-          )}
-
-          {activeTab === 'optimizer' && (
-            <PromptOptimizer draftedPrompt={formula.subject ? formula.subject : (compileQuickDraft())} />
-          )}
-
-          {activeTab === 'practice' && (
-            <PracticeArena />
-          )}
-
-          {activeTab === 'exporter' && (
-            <AgentExporter />
-          )}
+        {/* Every tab stays mounted so work in progress survives switching tabs. */}
+        <div hidden={tab !== 'glossary'}>
+          <InteractiveGlossary onAddTerm={addTerm} onTryInLab={tryInLab} focusTermId={focusTermId} onFocusHandled={() => setFocusTermId(null)} />
         </div>
-
+        <div hidden={tab !== 'builder'}>
+          <PromptBuilder formula={formula} setFormula={setFormula} target={target} setTarget={setTarget} onSendToSupercharger={sendToSupercharger} onOpenTerm={openTerm} />
+        </div>
+        <div hidden={tab !== 'lab'}>
+          <ABLab health={health} onHealthChange={refreshHealth} seedTermId={labSeed} onSeedHandled={() => setLabSeed(null)} onOpenTerm={openTerm} />
+        </div>
+        <div hidden={tab !== 'supercharger'}>
+          <PromptOptimizer health={health} incoming={incoming} formulaPrompt={formula.subject.trim() ? promptText(formula, target === 'veo' ? 'gemini' : target) : ''} onOpenTerm={openTerm} />
+        </div>
+        <div hidden={tab !== 'practice'}>
+          <PracticeArena health={health} onHealthChange={refreshHealth} onOpenTerm={openTerm} />
+        </div>
+        <div hidden={tab !== 'export'}>
+          <AgentExporter />
+        </div>
       </main>
 
-      {/* Stout masterclass footer with deep orange background */}
-      <footer className="bg-[#F27D26] text-black py-8 mt-20 font-bold">
-        <div className="max-w-7xl mx-auto px-6 sm:px-8 flex flex-col md:flex-row justify-between items-center gap-6 text-sm uppercase tracking-wider">
-          <div className="flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
-            <div>
-              <span className="text-[9px] uppercase font-black text-black/60 block leading-none">MODULE</span>
-              <span className="text-xs font-black tracking-wide leading-none mt-1 block">Visual Cinematography 101</span>
-            </div>
-            <div className="hidden md:block h-6 w-px bg-black/20"></div>
-            <div>
-              <span className="text-[9px] uppercase font-black text-black/60 block leading-none">LEXICON ASSISTANT LEVEL</span>
-              <span className="text-xs font-black tracking-wide leading-none mt-1 block">Expert-Integrated Matrices</span>
-            </div>
-          </div>
-          <div className="flex gap-4 items-center">
-            <span className="text-xs font-black">STUDIO HOST BIND: PORT 3000</span>
-            <div className="w-8 h-8 rounded-full border border-black flex items-center justify-center font-bold">→</div>
-          </div>
+      <footer className="border-t border-line mt-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row gap-3 justify-between text-sm text-muted">
+          <p>
+            {health?.hasKey
+              ? `Text features use ${modelLabel(health.textModel)} (falling back to ${modelLabel(health.fallbackModel)}), both on Gemini's free tier. Generating images needs billing.`
+              : 'Add a Gemini API key to .env to turn on the AI features. The glossary, diagrams, Formula Lab and export work without it.'}
+          </p>
+          <a href="https://aistudio.google.com/rate-limit" target="_blank" rel="noopener noreferrer" className="text-accent-text hover:underline whitespace-nowrap">Check your Gemini usage</a>
         </div>
       </footer>
+
+      {toast && (
+        <div role="status" className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 z-50 sm:max-w-sm bg-raised border border-line-strong rounded-lg shadow-2xl p-3.5 flex items-center gap-3 text-sm">
+          <p className="flex-1 text-ink">{toast.message}</p>
+          <button type="button" onClick={() => { go(toast.tab); setToast(null); }} className="text-accent-text font-semibold hover:underline cursor-pointer whitespace-nowrap">Open</button>
+          <button type="button" onClick={() => setToast(null)} className="text-subtle hover:text-ink cursor-pointer" aria-label="Dismiss">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

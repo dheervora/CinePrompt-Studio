@@ -1,47 +1,101 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
+/* Design tokens. Text colors are chosen to pass WCAG AA (4.5:1) on every surface below. */
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
-  --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-bg: #0A0A0B;
+  --color-surface: #121214;
+  --color-raised: #1A1A1E;
+  --color-line: #2C2C31;
+  --color-line-strong: #3D3D44;
+  --color-ink: #F2F2F2;
+  --color-muted: #B8B8BE;
+  --color-subtle: #95959C;
+  --color-accent: #F27D26;
+  --color-accent-soft: #F27D2624;
+  --color-accent-text: #FF9D55;
+  --color-good: #5EDC8F;
+  --color-warn: #F7C04A;
+  --color-bad: #FF8A80;
+}
+
+:root {
+  /* Height of the sticky tab bar; sticky panels offset themselves by this. */
+  --chrome-h: 52px;
+  color-scheme: dark;
+}
+
+html {
+  background-color: var(--color-bg);
 }
 
 body {
-  background-color: #050505;
-  color: #F2F2F2;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
   font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
 
-.font-display {
+h1, h2, h3, h4 {
   font-family: var(--font-display);
+  text-wrap: balance;
 }
 
-.font-serif {
-  font-family: var(--font-serif);
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
-.font-mono {
-  font-family: var(--font-mono);
+::selection {
+  background: #F27D2666;
 }
 
-/* Custom scrollbar adjustments for premium coding box styling */
+/* Horizontal tab strip scrolls without a visible bar. */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 2px;
+  background: #3D3D44;
+  border-radius: 4px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #F27D26;
+  background: #5A5A62;
 }
 
+/* Simulator animations; disabled for people who prefer reduced motion. */
+@keyframes cp-track { 0% { transform: translateX(-70px); } 100% { transform: translateX(70px); } }
+@keyframes cp-rise { 0% { transform: translate(0, 0); } 100% { transform: translate(0, -70px); } }
+@keyframes cp-pan { 0% { transform: rotate(-28deg); } 100% { transform: rotate(28deg); } }
+@keyframes cp-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(1.5px, -1px) rotate(0.6deg); }
+  40% { transform: translate(-1px, 1.5px) rotate(-0.5deg); }
+  60% { transform: translate(1px, 1px) rotate(0.4deg); }
+  80% { transform: translate(-1.5px, -0.5px) rotate(-0.3deg); }
+}
+@keyframes cp-dolly { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-60px); } }
+@keyframes cp-dolly-bg { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.7); } }
+@keyframes cp-dolly-cone { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(0.55); } }
+.cp-anim { animation-duration: 4s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; animation-direction: alternate; }
+.cp-anim-loop { animation-duration: 5s; animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  .cp-anim, .cp-anim-loop { animation: none !important; }
+  * { transition-duration: 0.01ms !important; }
+}
