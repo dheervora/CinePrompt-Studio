@@ -22,7 +22,7 @@ export async function postJson<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
-const HEALTH_FALLBACK: Health = { hasKey: false, textModel: 'gemini-3.8-flash', fallbackModel: 'gemini-3.7-flash', imageModel: '', imageStatus: 'unknown' };
+const HEALTH_FALLBACK: Health = { hasKey: false, textModel: 'gemini-3.8-flash', fallbackModel: 'gemini-3.6-flash', imageModel: '', imageStatus: 'unknown' };
 
 export function useHealth(): [Health | null, () => void] {
   const [health, setHealth] = useState<Health | null>(null);

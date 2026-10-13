@@ -14,7 +14,7 @@ const PORT = Number(process.env.PORT) || 3000;
 // Local runs stay private to this computer; Cloud Run (AI Studio deploys) sets K_SERVICE and needs 0.0.0.0.
 const HOST = process.env.HOST || (process.env.K_SERVICE ? '0.0.0.0' : '127.0.0.1');
 const TEXT_MODEL = process.env.TEXT_MODEL || 'gemini-3.8-flash';
-const FALLBACK_TEXT_MODEL = process.env.FALLBACK_TEXT_MODEL || 'gemini-3.7-flash';
+const FALLBACK_TEXT_MODEL = process.env.FALLBACK_TEXT_MODEL || 'gemini-3.6-flash';
 const IMAGE_MODEL = process.env.IMAGE_MODEL || 'gemini-3.1-flash-lite-image';
 const IMAGE_CACHE_DIR = path.join(process.cwd(), '.cache', 'images');
 

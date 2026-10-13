@@ -25,7 +25,7 @@ Get a free key at <https://aistudio.google.com/apikey>. Without a key, the gloss
 
 ## Models and cost
 
-- **Text features** (Supercharger, Practice grading, A/B image comparison) use `gemini-3.8-flash`, falling back to `gemini-3.7-flash` when it's busy. Both are on Gemini's **free tier**. Override with `TEXT_MODEL` / `FALLBACK_TEXT_MODEL`.
+- **Text features** (Supercharger, Practice grading, A/B image comparison) use `gemini-3.8-flash`, falling back to `gemini-3.6-flash` when it's busy. Both are on Gemini's **free tier**. Override with `TEXT_MODEL` / `FALLBACK_TEXT_MODEL`.
 - **Image generation** uses `gemini-3.1-flash-lite-image` (override with `IMAGE_MODEL`). Google's image models have **no free tier**, so this only works once billing is enabled on your AI Studio project (about $0.03 per image). Set `IMAGE_GENERATION=off` to hide it.
 - **Free route for images:** copy a prompt into the [Gemini app](https://gemini.google.com/app), save the picture, and upload it to the A/B Lab or Practice tab. Gemini 3.8 Flash (free) compares or grades it.
 
